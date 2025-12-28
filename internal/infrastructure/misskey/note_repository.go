@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -122,10 +123,10 @@ func (r *noteRepository) Post(ctx context.Context, note *entity.Note) error {
 	}
 
 	url := r.host
-	if len(url) < 7 || (url[:7] != "http://" && url[:8] != "https://") {
-		url = fmt.Sprintf("https://%s", url)
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		url = "https://" + url
 	}
-	url = fmt.Sprintf("%s/api/notes/create", url)
+	url = url + "/api/notes/create"
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payload))
 	if err != nil {
