@@ -44,19 +44,34 @@ func (s *RSSFeedService) ProcessFeed(ctx context.Context, rssURL string) error {
 		return fmt.Errorf("failed to get latest published time: %w", err)
 	}
 
-	var newEntries []*entity.FeedEntry
-	for _, entry := range entries {
-		processed, err := s.cacheRepo.IsProcessed(ctx, entry.GUID)
-		if err != nil {
-			log.Printf("Failed to check if processed [GUID: %s]: %v", entry.GUID, err)
-			continue
-		}
-		if processed {
-			continue
-		}
+	isFirstRun := latestPublished.IsZero()
 
-		if entry.IsNewerThan(latestPublished) {
-			newEntries = append(newEntries, entry)
+	var newEntries []*entity.FeedEntry
+
+	if isFirstRun {
+		var mostRecent *entity.FeedEntry
+		for _, entry := range entries {
+			if mostRecent == nil || entry.Published.After(mostRecent.Published) {
+				mostRecent = entry
+			}
+		}
+		if mostRecent != nil {
+			newEntries = append(newEntries, mostRecent)
+		}
+	} else {
+		for _, entry := range entries {
+			processed, err := s.cacheRepo.IsProcessed(ctx, entry.GUID)
+			if err != nil {
+				log.Printf("Failed to check if processed [GUID: %s]: %v", entry.GUID, err)
+				continue
+			}
+			if processed {
+				continue
+			}
+
+			if entry.IsNewerThan(latestPublished) {
+				newEntries = append(newEntries, entry)
+			}
 		}
 	}
 

@@ -84,13 +84,16 @@ func TestRSSFeedService_ProcessFeed_NewEntries(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(noteRepo.posted) != 3 {
-		t.Errorf("expected 3 notes posted, got %d", len(noteRepo.posted))
+	if len(noteRepo.posted) != 1 {
+		t.Errorf("expected 1 note posted on first run (most recent only), got %d", len(noteRepo.posted))
 	}
-	for _, entry := range entries {
-		if !cacheRepo.processedGUIDs[entry.GUID] {
-			t.Errorf("GUID %s was not marked as processed", entry.GUID)
-		}
+
+	if len(noteRepo.posted) > 0 && noteRepo.posted[0].Text != "📰 Article 3\nhttps://example.tld/3" {
+		t.Errorf("expected most recent article (Article 3) to be posted first")
+	}
+
+	if !cacheRepo.processedGUIDs["guid-3"] {
+		t.Errorf("GUID guid-3 was not marked as processed")
 	}
 }
 
@@ -107,6 +110,7 @@ func TestRSSFeedService_ProcessFeed_SkipProcessedEntries(t *testing.T) {
 	noteRepo := &mockNoteRepository{}
 	cacheRepo := newMockCacheRepository()
 	cacheRepo.processedGUIDs["guid-1"] = true
+	cacheRepo.latestTime = now.Add(-2 * time.Hour)
 
 	service := NewRSSFeedService(feedRepo, noteRepo, cacheRepo)
 
@@ -160,7 +164,7 @@ func TestRSSFeedService_ProcessAllFeeds(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if len(noteRepo.posted) != 2 {
-		t.Errorf("expected 2 notes posted, got %d", len(noteRepo.posted))
+	if len(noteRepo.posted) != 1 {
+		t.Errorf("expected 1 note posted on first run (most recent only), got %d", len(noteRepo.posted))
 	}
 }
