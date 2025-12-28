@@ -121,7 +121,12 @@ func (r *noteRepository) Post(ctx context.Context, note *entity.Note) error {
 		return fmt.Errorf("failed to serialize note: %w", err)
 	}
 
-	url := fmt.Sprintf("https://%s/api/notes/create", r.host)
+	url := r.host
+	if len(url) < 7 || (url[:7] != "http://" && url[:8] != "https://") {
+		url = fmt.Sprintf("https://%s", url)
+	}
+	url = fmt.Sprintf("%s/api/notes/create", url)
+
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create HTTP request: %w", err)
