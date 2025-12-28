@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"time"
 
 	"misskeyRSSbot/internal/domain/entity"
@@ -120,12 +121,7 @@ func (s *RSSFeedService) ProcessAllFeeds(ctx context.Context, rssURLs []string) 
 }
 
 func sortEntriesByPublishedAsc(entries []*entity.FeedEntry) {
-	n := len(entries)
-	for i := 0; i < n-1; i++ {
-		for j := 0; j < n-i-1; j++ {
-			if entries[j].Published.After(entries[j+1].Published) {
-				entries[j], entries[j+1] = entries[j+1], entries[j]
-			}
-		}
-	}
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Published.Before(entries[j].Published)
+	})
 }
