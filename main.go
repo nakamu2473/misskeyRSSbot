@@ -28,7 +28,7 @@ func main() {
 	noteRepo := misskey.NewNoteRepository(misskey.Config{
 		Host:           cfg.MisskeyHost,
 		AuthToken:      cfg.AuthToken,
-		MaxRequests:    cfg.MaxRequests,
+		MaxPermits:     cfg.MaxPermits,
 		RefillInterval: cfg.GetRefillInterval(),
 	})
 	cacheRepo := storage.NewMemoryCacheRepository()

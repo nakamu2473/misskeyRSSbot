@@ -17,7 +17,7 @@ type Config struct {
 
 	FetchInterval int `envconfig:"FETCH_INTERVAL" default:"30"`
 
-	MaxRequests int `envconfig:"MAX_REQUESTS" default:"3"`
+	MaxPermits int `envconfig:"MAX_PERMITS" default:"3"`
 
 	RefillInterval int `envconfig:"REFILL_INTERVAL" default:"10"`
 }

@@ -15,16 +15,16 @@ import (
 
 type rateLimiter struct {
 	mu         sync.Mutex
-	tokens     int
-	maxTokens  int
+	permits    int
+	maxPermits int
 	refillRate time.Duration
 	lastRefill time.Time
 }
 
-func newRateLimiter(maxTokens int, refillRate time.Duration) *rateLimiter {
+func newRateLimiter(maxPermits int, refillRate time.Duration) *rateLimiter {
 	return &rateLimiter{
-		tokens:     maxTokens,
-		maxTokens:  maxTokens,
+		permits:    maxPermits,
+		maxPermits: maxPermits,
 		refillRate: refillRate,
 		lastRefill: time.Now(),
 	}
@@ -35,13 +35,13 @@ func (rl *rateLimiter) Wait(ctx context.Context) error {
 
 	now := time.Now()
 	elapsed := now.Sub(rl.lastRefill)
-	tokensToAdd := int(elapsed / rl.refillRate)
-	if tokensToAdd > 0 {
-		rl.tokens = min(rl.tokens+tokensToAdd, rl.maxTokens)
+	permitsToAdd := int(elapsed / rl.refillRate)
+	if permitsToAdd > 0 {
+		rl.permits = min(rl.permits+permitsToAdd, rl.maxPermits)
 		rl.lastRefill = now
 	}
 
-	if rl.tokens <= 0 {
+	if rl.permits <= 0 {
 		waitTime := rl.refillRate - (now.Sub(rl.lastRefill) % rl.refillRate)
 		rl.mu.Unlock()
 
@@ -53,15 +53,15 @@ func (rl *rateLimiter) Wait(ctx context.Context) error {
 			return ctx.Err()
 		case <-timer.C:
 			rl.mu.Lock()
-			rl.tokens = 1
+			rl.permits = 1
 			rl.lastRefill = time.Now()
-			rl.tokens--
+			rl.permits--
 			rl.mu.Unlock()
 			return nil
 		}
 	}
 
-	rl.tokens--
+	rl.permits--
 	rl.mu.Unlock()
 	return nil
 }
@@ -83,14 +83,14 @@ type noteRepository struct {
 type Config struct {
 	Host           string
 	AuthToken      string
-	MaxRequests    int
+	MaxPermits     int
 	RefillInterval time.Duration
 }
 
 func NewNoteRepository(cfg Config) repository.NoteRepository {
-	maxRequests := cfg.MaxRequests
-	if maxRequests == 0 {
-		maxRequests = 3
+	maxPermits := cfg.MaxPermits
+	if maxPermits == 0 {
+		maxPermits = 3
 	}
 	refillInterval := cfg.RefillInterval
 	if refillInterval == 0 {
@@ -101,7 +101,7 @@ func NewNoteRepository(cfg Config) repository.NoteRepository {
 		host:        cfg.Host,
 		authToken:   cfg.AuthToken,
 		client:      &http.Client{Timeout: 30 * time.Second},
-		rateLimiter: newRateLimiter(maxRequests, refillInterval),
+		rateLimiter: newRateLimiter(maxPermits, refillInterval),
 	}
 }
 
