@@ -14,7 +14,7 @@ import (
 type geminiSummarizer struct {
 	client       *genai.Client
 	model        string
-	maxTokens    int32
+	maxTokens    *int32
 	systemPrompt string
 	timeout      time.Duration
 }
@@ -24,19 +24,20 @@ func newGeminiSummarizer(cfg Config) (repository.SummarizerRepository, error) {
 		return nil, fmt.Errorf("Gemini API key is required")
 	}
 
-	model := cfg.Model
-	if model == "" {
-		model = "gemini-1.5-flash" // コスト効率の良いデフォルト
+	if cfg.Model == "" {
+		return nil, fmt.Errorf("Gemini model name is required")
 	}
 
-	maxTokens := cfg.MaxTokens
-	if maxTokens == 0 {
-		maxTokens = 500
+	// maxTokensが0の場合はnil（指定なし）にする
+	var maxTokens *int32
+	if cfg.MaxTokens > 0 {
+		tokens := int32(cfg.MaxTokens)
+		maxTokens = &tokens
 	}
 
-	prompt := cfg.Prompt
-	if prompt == "" {
-		prompt = DefaultSystemPrompt
+	systemInstruction := cfg.SystemInstruction
+	if systemInstruction == "" {
+		systemInstruction = DefaultSystemPrompt
 	}
 
 	timeout := cfg.Timeout
@@ -56,9 +57,9 @@ func newGeminiSummarizer(cfg Config) (repository.SummarizerRepository, error) {
 
 	return &geminiSummarizer{
 		client:       client,
-		model:        model,
-		maxTokens:    int32(maxTokens),
-		systemPrompt: prompt,
+		model:        cfg.Model,
+		maxTokens:    maxTokens,
+		systemPrompt: systemInstruction,
 		timeout:      timeout,
 	}, nil
 }
@@ -78,9 +79,12 @@ func (s *geminiSummarizer) Summarize(ctx context.Context, url, title string) (st
 	// GenerateContent設定
 	temperature := float32(0.3)
 	config := &genai.GenerateContentConfig{
-		MaxOutputTokens: s.maxTokens,
-		Temperature:     &temperature,
+		Temperature:       &temperature,
 		SystemInstruction: systemInstruction,
+	}
+	// maxTokensが指定されている場合のみ設定
+	if s.maxTokens != nil {
+		config.MaxOutputTokens = *s.maxTokens
 	}
 
 	// Gemini API呼び出し

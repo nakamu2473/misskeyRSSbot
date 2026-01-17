@@ -10,7 +10,7 @@ func TestNewSummarizerRepository_Gemini(t *testing.T) {
 	cfg := Config{
 		Provider: "gemini",
 		APIKey:   "test-api-key",
-		Model:    "gemini-1.5-flash",
+		Model:    "gemini-2.0-flash-exp",
 	}
 
 	repo, err := NewSummarizerRepository(cfg)
@@ -77,6 +77,7 @@ func TestNewSummarizerRepository_GeminiNoAPIKey(t *testing.T) {
 	cfg := Config{
 		Provider: "gemini",
 		APIKey:   "",
+		Model:    "gemini-2.0-flash-exp",
 	}
 
 	_, err := NewSummarizerRepository(cfg)
@@ -85,10 +86,24 @@ func TestNewSummarizerRepository_GeminiNoAPIKey(t *testing.T) {
 	}
 }
 
+func TestNewSummarizerRepository_GeminiNoModel(t *testing.T) {
+	cfg := Config{
+		Provider: "gemini",
+		APIKey:   "test-key",
+		Model:    "",
+	}
+
+	_, err := NewSummarizerRepository(cfg)
+	if err == nil {
+		t.Error("expected error when gemini model is empty, got nil")
+	}
+}
+
 func TestConfig_Defaults(t *testing.T) {
 	cfg := Config{
 		Provider: "gemini",
 		APIKey:   "test-key",
+		Model:    "gemini-2.0-flash-exp",
 	}
 
 	// Gemini summarizerを作成してデフォルト値を確認
@@ -100,12 +115,12 @@ func TestConfig_Defaults(t *testing.T) {
 	gs := summarizer.(*geminiSummarizer)
 
 	// デフォルト値の確認
-	if gs.model != "gemini-1.5-flash" {
-		t.Errorf("expected default model 'gemini-1.5-flash', got %s", gs.model)
+	if gs.model != "gemini-2.0-flash-exp" {
+		t.Errorf("expected model 'gemini-2.0-flash-exp', got %s", gs.model)
 	}
 
-	if gs.maxTokens != 500 {
-		t.Errorf("expected default maxTokens 500, got %d", gs.maxTokens)
+	if gs.maxTokens != nil {
+		t.Errorf("expected default maxTokens to be nil (no limit), got %d", *gs.maxTokens)
 	}
 
 	expectedTimeout := 30 * time.Second
@@ -119,14 +134,14 @@ func TestConfig_Defaults(t *testing.T) {
 }
 
 func TestConfig_CustomValues(t *testing.T) {
-	customPrompt := "カスタムプロンプト"
+	customInstruction := "カスタムシステムインストラクション"
 	cfg := Config{
-		Provider:  "gemini",
-		APIKey:    "test-key",
-		Model:     "gemini-1.5-pro",
-		MaxTokens: 1000,
-		Timeout:   60 * time.Second,
-		Prompt:    customPrompt,
+		Provider:          "gemini",
+		APIKey:            "test-key",
+		Model:             "gemini-1.5-pro",
+		MaxTokens:         1000,
+		Timeout:           60 * time.Second,
+		SystemInstruction: customInstruction,
 	}
 
 	summarizer, err := newGeminiSummarizer(cfg)
@@ -140,15 +155,17 @@ func TestConfig_CustomValues(t *testing.T) {
 		t.Errorf("expected model 'gemini-1.5-pro', got %s", gs.model)
 	}
 
-	if gs.maxTokens != 1000 {
-		t.Errorf("expected maxTokens 1000, got %d", gs.maxTokens)
+	if gs.maxTokens == nil {
+		t.Error("expected maxTokens to be set, got nil")
+	} else if *gs.maxTokens != 1000 {
+		t.Errorf("expected maxTokens 1000, got %d", *gs.maxTokens)
 	}
 
 	if gs.timeout != 60*time.Second {
 		t.Errorf("expected timeout 60s, got %v", gs.timeout)
 	}
 
-	if gs.systemPrompt != customPrompt {
-		t.Errorf("expected custom prompt '%s', got '%s'", customPrompt, gs.systemPrompt)
+	if gs.systemPrompt != customInstruction {
+		t.Errorf("expected custom instruction '%s', got '%s'", customInstruction, gs.systemPrompt)
 	}
 }
