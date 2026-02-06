@@ -304,3 +304,86 @@ func TestRSSFeedService_ProcessFeed_SummarizerError(t *testing.T) {
 		t.Error("expected note not to contain summary when summarization fails")
 	}
 }
+
+func TestRSSFeedService_ProcessFeed_FirstRunLatestOnlyEnabled(t *testing.T) {
+	ctx := context.Background()
+
+	now := time.Now()
+	entries := []*entity.FeedEntry{
+		entity.NewFeedEntry("Article 1", "https://example.tld/1", "Desc 1", now.Add(-2*time.Hour), "guid-1"),
+		entity.NewFeedEntry("Article 2", "https://example.tld/2", "Desc 2", now.Add(-1*time.Hour), "guid-2"),
+		entity.NewFeedEntry("Article 3", "https://example.tld/3", "Desc 3", now, "guid-3"),
+	}
+
+	feedRepo := &mockFeedRepository{entries: entries}
+	noteRepo := &mockNoteRepository{}
+	cacheRepo := newMockCacheRepository()
+
+	service := NewRSSFeedService(feedRepo, noteRepo, cacheRepo, nil, WithFirstRunLatestOnly(true))
+
+	err := service.ProcessFeed(ctx, "https://example.tld/rss")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(noteRepo.posted) != 1 {
+		t.Errorf("expected 1 note posted (most recent only), got %d", len(noteRepo.posted))
+	}
+
+	if len(noteRepo.posted) > 0 && !strings.Contains(noteRepo.posted[0].Text, "Article 3") {
+		t.Errorf("expected most recent article (Article 3) to be posted")
+	}
+}
+
+func TestRSSFeedService_ProcessFeed_FirstRunLatestOnlyDisabled(t *testing.T) {
+	ctx := context.Background()
+
+	now := time.Now()
+	entries := []*entity.FeedEntry{
+		entity.NewFeedEntry("Article 1", "https://example.tld/1", "Desc 1", now.Add(-2*time.Hour), "guid-1"),
+		entity.NewFeedEntry("Article 2", "https://example.tld/2", "Desc 2", now.Add(-1*time.Hour), "guid-2"),
+		entity.NewFeedEntry("Article 3", "https://example.tld/3", "Desc 3", now, "guid-3"),
+	}
+
+	feedRepo := &mockFeedRepository{entries: entries}
+	noteRepo := &mockNoteRepository{}
+	cacheRepo := newMockCacheRepository()
+
+	service := NewRSSFeedService(feedRepo, noteRepo, cacheRepo, nil, WithFirstRunLatestOnly(false))
+
+	err := service.ProcessFeed(ctx, "https://example.tld/rss")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(noteRepo.posted) != 3 {
+		t.Errorf("expected 3 notes posted (all entries), got %d", len(noteRepo.posted))
+	}
+}
+
+func TestRSSFeedService_ProcessFeed_FirstRunLatestOnlyDisabled_SkipProcessed(t *testing.T) {
+	ctx := context.Background()
+
+	now := time.Now()
+	entries := []*entity.FeedEntry{
+		entity.NewFeedEntry("Article 1", "https://example.tld/1", "Desc 1", now.Add(-2*time.Hour), "guid-1"),
+		entity.NewFeedEntry("Article 2", "https://example.tld/2", "Desc 2", now.Add(-1*time.Hour), "guid-2"),
+		entity.NewFeedEntry("Article 3", "https://example.tld/3", "Desc 3", now, "guid-3"),
+	}
+
+	feedRepo := &mockFeedRepository{entries: entries}
+	noteRepo := &mockNoteRepository{}
+	cacheRepo := newMockCacheRepository()
+	cacheRepo.processedGUIDs["guid-1"] = true
+
+	service := NewRSSFeedService(feedRepo, noteRepo, cacheRepo, nil, WithFirstRunLatestOnly(false))
+
+	err := service.ProcessFeed(ctx, "https://example.tld/rss")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(noteRepo.posted) != 2 {
+		t.Errorf("expected 2 notes posted (skipping processed guid-1), got %d", len(noteRepo.posted))
+	}
+}
