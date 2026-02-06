@@ -20,11 +20,11 @@ type geminiSummarizer struct {
 
 func newGeminiSummarizer(ctx context.Context, cfg Config) (repository.SummarizerRepository, error) {
 	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("Gemini API key is required")
+		return nil, fmt.Errorf("gemini API key is required")
 	}
 
 	if cfg.Model == "" {
-		return nil, fmt.Errorf("Gemini model name is required")
+		return nil, fmt.Errorf("gemini model name is required")
 	}
 
 	var maxTokens *int32
@@ -47,7 +47,7 @@ func newGeminiSummarizer(ctx context.Context, cfg Config) (repository.Summarizer
 		APIKey: cfg.APIKey,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+		return nil, fmt.Errorf("failed to create gemini client: %w", err)
 	}
 
 	return &geminiSummarizer{
@@ -83,7 +83,7 @@ func (s *geminiSummarizer) Summarize(ctx context.Context, url, title string) (st
 	}
 
 	if len(resp.Candidates) == 0 {
-		return "", fmt.Errorf("no candidates returned from Gemini API")
+		return "", fmt.Errorf("no candidates returned from gemini API")
 	}
 
 	candidate := resp.Candidates[0]

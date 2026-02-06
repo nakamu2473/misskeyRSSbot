@@ -146,7 +146,7 @@ func (r *noteRepository) Post(ctx context.Context, note *entity.Note) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Misskey API returned non-OK status: %d", resp.StatusCode)
+		return fmt.Errorf("misskey API returned non-OK status: %d", resp.StatusCode)
 	}
 
 	return nil
