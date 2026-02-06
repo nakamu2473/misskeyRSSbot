@@ -39,8 +39,13 @@ func main() {
 		LocalOnly:      cfg.LocalOnly,
 	})
 
+	type cacheWithCleanup interface {
+		CleanupOldGUIDs(ctx context.Context, olderThan time.Duration) (int64, error)
+	}
+
 	var cacheRepo repository.CacheRepository
 	var cacheCloser io.Closer
+	var cacheCleaner cacheWithCleanup
 	firstRunLatestOnly := cfg.FirstRunLatestOnly
 	if cfg.IsPersistentCache() {
 		sqliteCache, cacheErr := storage.NewSQLiteCacheRepository(cfg.CacheDBPath)
@@ -50,6 +55,9 @@ func main() {
 		cacheRepo = sqliteCache
 		if closer, ok := sqliteCache.(io.Closer); ok {
 			cacheCloser = closer
+		}
+		if cleaner, ok := sqliteCache.(cacheWithCleanup); ok {
+			cacheCleaner = cleaner
 		}
 		log.Printf("Using persistent cache: %s", cfg.CacheDBPath)
 	} else {
@@ -108,11 +116,26 @@ func main() {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	var cleanupTicker *time.Ticker
+	if cacheCleaner != nil {
+		cleanupInterval := cfg.GetCacheCleanupInterval()
+		log.Printf("Cache cleanup interval: %v", cleanupInterval)
+		cleanupTicker = time.NewTicker(cleanupInterval)
+		defer cleanupTicker.Stop()
+	}
+
 	log.Println("Fetching RSS feeds...")
 	if err := service.ProcessAllFeeds(ctx, cfg.RSSURL); err != nil {
 		log.Printf("RSS processing error: %v", err)
 	}
 	log.Println("RSS feeds fetched")
+
+	cleanupChan := func() <-chan time.Time {
+		if cleanupTicker != nil {
+			return cleanupTicker.C
+		}
+		return nil
+	}()
 
 	for {
 		select {
@@ -130,6 +153,14 @@ func main() {
 				log.Printf("RSS processing error: %v", err)
 			}
 			log.Println("RSS feeds fetched")
+		case <-cleanupChan:
+			retentionPeriod := cfg.GetCacheRetentionPeriod()
+			deleted, err := cacheCleaner.CleanupOldGUIDs(ctx, retentionPeriod)
+			if err != nil {
+				log.Printf("Cache cleanup error: %v", err)
+			} else if deleted > 0 {
+				log.Printf("Cache cleanup: removed %d old entries", deleted)
+			}
 		}
 	}
 }

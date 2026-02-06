@@ -32,6 +32,10 @@ type Config struct {
 
 	CacheDBPath string `envconfig:"CACHE_DB_PATH" default:""`
 
+	CacheCleanupInterval int `envconfig:"CACHE_CLEANUP_INTERVAL" default:"24"`
+
+	CacheRetentionDays int `envconfig:"CACHE_RETENTION_DAYS" default:"7"`
+
 	FirstRunLatestOnly bool `envconfig:"FIRST_RUN_LATEST_ONLY" default:"true"`
 }
 
@@ -117,4 +121,12 @@ func (c *Config) GetLLMConfig() LLMConfig {
 
 func (c *Config) IsPersistentCache() bool {
 	return c.CacheDBPath != ""
+}
+
+func (c *Config) GetCacheCleanupInterval() time.Duration {
+	return time.Duration(c.CacheCleanupInterval) * time.Hour
+}
+
+func (c *Config) GetCacheRetentionPeriod() time.Duration {
+	return time.Duration(c.CacheRetentionDays) * 24 * time.Hour
 }
