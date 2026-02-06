@@ -4,3 +4,4 @@ misskeyRSSbot
 .DS_Store
 .vscode/
 .idea/
+cache.db
