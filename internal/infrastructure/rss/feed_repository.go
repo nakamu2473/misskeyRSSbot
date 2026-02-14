@@ -3,6 +3,8 @@ package rss
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"misskeyRSSbot/internal/domain/entity"
 	"misskeyRSSbot/internal/domain/repository"
@@ -20,13 +22,20 @@ func NewFeedRepository() repository.FeedRepository {
 	}
 }
 
-func (r *feedRepository) Fetch(ctx context.Context, url string) ([]*entity.FeedEntry, error) {
+func (r *feedRepository) Fetch(ctx context.Context, url string, useFilter bool) ([]*entity.FeedEntry, error) {
 	feed, err := r.parser.ParseURLWithContext(url, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse RSS feed: %w", err)
 	}
 
 	entries := make([]*entity.FeedEntry, 0, len(feed.Items))
+
+	var keywords []string
+	if useFilter {
+		keywordsEnv := os.Getenv("SEARCH_KEYWORDS")
+		keywords = strings.Split(keywordsEnv, ",")
+	}
+
 	for _, item := range feed.Items {
 		if item.PublishedParsed == nil {
 			continue
@@ -44,6 +53,26 @@ func (r *feedRepository) Fetch(ctx context.Context, url string) ([]*entity.FeedE
 			*item.PublishedParsed,
 			guid,
 		)
+
+		if useFilter {
+			found := false
+			for _, k := range keywords {
+				trimmedK := strings.TrimSpace(k)
+				if trimmedK == "" {
+					continue
+				}
+
+				if strings.Contains(entry.Title, trimmedK) || strings.Contains(entry.Description, trimmedK) {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				continue
+			}
+		}
+
 		entries = append(entries, entry)
 	}
 

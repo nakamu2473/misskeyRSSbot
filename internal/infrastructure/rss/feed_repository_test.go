@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 )
@@ -40,7 +41,7 @@ func TestFeedRepository_Fetch_Success(t *testing.T) {
 	repo := NewFeedRepository()
 	ctx := context.Background()
 
-	entries, err := repo.Fetch(ctx, server.URL)
+	entries, err := repo.Fetch(ctx, server.URL, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -84,7 +85,7 @@ func TestFeedRepository_Fetch_EmptyGUID(t *testing.T) {
 	repo := NewFeedRepository()
 	ctx := context.Background()
 
-	entries, err := repo.Fetch(ctx, server.URL)
+	entries, err := repo.Fetch(ctx, server.URL, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestFeedRepository_Fetch_SkipNoPubDate(t *testing.T) {
 	repo := NewFeedRepository()
 	ctx := context.Background()
 
-	entries, err := repo.Fetch(ctx, server.URL)
+	entries, err := repo.Fetch(ctx, server.URL, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -145,7 +146,7 @@ func TestFeedRepository_Fetch_InvalidURL(t *testing.T) {
 	repo := NewFeedRepository()
 	ctx := context.Background()
 
-	_, err := repo.Fetch(ctx, "http://invalid-url-that-does-not-exist-12345.com/feed")
+	_, err := repo.Fetch(ctx, "http://invalid-url-that-does-not-exist-12345.com/feed", false)
 	if err == nil {
 		t.Error("expected error for invalid URL, got nil")
 	}
@@ -162,7 +163,7 @@ func TestFeedRepository_Fetch_InvalidXML(t *testing.T) {
 	repo := NewFeedRepository()
 	ctx := context.Background()
 
-	_, err := repo.Fetch(ctx, server.URL)
+	_, err := repo.Fetch(ctx, server.URL, false)
 	if err == nil {
 		t.Error("expected error for invalid XML, got nil")
 	}
@@ -181,8 +182,226 @@ func TestFeedRepository_Fetch_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := repo.Fetch(ctx, server.URL)
+	_, err := repo.Fetch(ctx, server.URL, false)
 	if err == nil {
 		t.Error("expected error for cancelled context, got nil")
+	}
+}
+
+func TestFeedRepository_Fetch_FilterMatchesTitle(t *testing.T) {
+	rssXML := `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+	<channel>
+		<title>Test Feed</title>
+		<item>
+			<title>マユリカの新番組</title>
+			<link>https://example.com/1</link>
+			<description>お笑いの話題</description>
+			<guid>guid-1</guid>
+			<pubDate>Mon, 02 Jan 2006 15:04:05 MST</pubDate>
+		</item>
+		<item>
+			<title>関係ない記事</title>
+			<link>https://example.com/2</link>
+			<description>関係ない内容</description>
+			<guid>guid-2</guid>
+			<pubDate>Tue, 03 Jan 2006 15:04:05 MST</pubDate>
+		</item>
+	</channel>
+</rss>`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(rssXML))
+	}))
+	defer server.Close()
+
+	os.Setenv("SEARCH_KEYWORDS", "マユリカ,エバース")
+	defer os.Unsetenv("SEARCH_KEYWORDS")
+
+	repo := NewFeedRepository()
+	ctx := context.Background()
+
+	entries, err := repo.Fetch(ctx, server.URL, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry matching keyword, got %d", len(entries))
+	}
+
+	if entries[0].Title != "マユリカの新番組" {
+		t.Errorf("expected 'マユリカの新番組', got '%s'", entries[0].Title)
+	}
+}
+
+func TestFeedRepository_Fetch_FilterMatchesDescription(t *testing.T) {
+	rssXML := `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+	<channel>
+		<title>Test Feed</title>
+		<item>
+			<title>お笑い番組まとめ</title>
+			<link>https://example.com/1</link>
+			<description>エバースが出演する番組の情報</description>
+			<guid>guid-1</guid>
+			<pubDate>Mon, 02 Jan 2006 15:04:05 MST</pubDate>
+		</item>
+		<item>
+			<title>別の記事</title>
+			<link>https://example.com/2</link>
+			<description>全く関係ない内容です</description>
+			<guid>guid-2</guid>
+			<pubDate>Tue, 03 Jan 2006 15:04:05 MST</pubDate>
+		</item>
+	</channel>
+</rss>`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(rssXML))
+	}))
+	defer server.Close()
+
+	os.Setenv("SEARCH_KEYWORDS", "マユリカ,エバース")
+	defer os.Unsetenv("SEARCH_KEYWORDS")
+
+	repo := NewFeedRepository()
+	ctx := context.Background()
+
+	entries, err := repo.Fetch(ctx, server.URL, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry matching keyword in description, got %d", len(entries))
+	}
+
+	if entries[0].GUID != "guid-1" {
+		t.Errorf("expected guid-1, got '%s'", entries[0].GUID)
+	}
+}
+
+func TestFeedRepository_Fetch_FilterDisabledReturnsAll(t *testing.T) {
+	rssXML := `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+	<channel>
+		<title>Test Feed</title>
+		<item>
+			<title>記事1</title>
+			<link>https://example.com/1</link>
+			<description>内容1</description>
+			<guid>guid-1</guid>
+			<pubDate>Mon, 02 Jan 2006 15:04:05 MST</pubDate>
+		</item>
+		<item>
+			<title>記事2</title>
+			<link>https://example.com/2</link>
+			<description>内容2</description>
+			<guid>guid-2</guid>
+			<pubDate>Tue, 03 Jan 2006 15:04:05 MST</pubDate>
+		</item>
+	</channel>
+</rss>`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(rssXML))
+	}))
+	defer server.Close()
+
+	os.Setenv("SEARCH_KEYWORDS", "マユリカ")
+	defer os.Unsetenv("SEARCH_KEYWORDS")
+
+	repo := NewFeedRepository()
+	ctx := context.Background()
+
+	entries, err := repo.Fetch(ctx, server.URL, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries when filter is disabled, got %d", len(entries))
+	}
+}
+
+func TestFeedRepository_Fetch_FilterNoMatch(t *testing.T) {
+	rssXML := `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+	<channel>
+		<title>Test Feed</title>
+		<item>
+			<title>関係ない記事</title>
+			<link>https://example.com/1</link>
+			<description>関係ない内容</description>
+			<guid>guid-1</guid>
+			<pubDate>Mon, 02 Jan 2006 15:04:05 MST</pubDate>
+		</item>
+	</channel>
+</rss>`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(rssXML))
+	}))
+	defer server.Close()
+
+	os.Setenv("SEARCH_KEYWORDS", "マユリカ,エバース")
+	defer os.Unsetenv("SEARCH_KEYWORDS")
+
+	repo := NewFeedRepository()
+	ctx := context.Background()
+
+	entries, err := repo.Fetch(ctx, server.URL, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(entries) != 0 {
+		t.Errorf("expected 0 entries when no keywords match, got %d", len(entries))
+	}
+}
+
+func TestFeedRepository_Fetch_FilterEmptyKeywords(t *testing.T) {
+	rssXML := `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+	<channel>
+		<title>Test Feed</title>
+		<item>
+			<title>記事1</title>
+			<link>https://example.com/1</link>
+			<description>内容1</description>
+			<guid>guid-1</guid>
+			<pubDate>Mon, 02 Jan 2006 15:04:05 MST</pubDate>
+		</item>
+	</channel>
+</rss>`
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/rss+xml")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(rssXML))
+	}))
+	defer server.Close()
+
+	os.Unsetenv("SEARCH_KEYWORDS")
+
+	repo := NewFeedRepository()
+	ctx := context.Background()
+
+	entries, err := repo.Fetch(ctx, server.URL, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(entries) != 0 {
+		t.Errorf("expected 0 entries when SEARCH_KEYWORDS is empty with filter enabled, got %d", len(entries))
 	}
 }
