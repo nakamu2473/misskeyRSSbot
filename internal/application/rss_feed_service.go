@@ -49,12 +49,11 @@ func NewRSSFeedService(
 }
 
 func (s *RSSFeedService) ProcessFeed(ctx context.Context, rssURL string, useFilter bool) error {
-    entries, err := s.feedRepo.Fetch(ctx, rssURL, useFilter)
-    if err != nil {
-        return fmt.Errorf("failed to fetch RSS feed [%s]: %w", rssURL, err)
-    }
+	entries, err := s.feedRepo.Fetch(ctx, rssURL, useFilter)
+	if err != nil {
+		return fmt.Errorf("failed to fetch RSS feed [%s]: %w", rssURL, err)
+	}
 	log.Printf("Processing %d entries from %s", len(entries), rssURL)
-
 
 	if len(entries) == 0 {
 		log.Printf("No entries found in RSS URL: %s", rssURL)
@@ -182,12 +181,12 @@ func (s *RSSFeedService) summarizeEntry(ctx context.Context, entry *entity.FeedE
 }
 
 func (s *RSSFeedService) ProcessAllFeeds(ctx context.Context, rssSettings []config.RSSSettings) error {
-    for _, setting := range rssSettings {
-        if err := s.ProcessFeed(ctx, setting.URL, setting.Filter); err != nil {
-            log.Printf("Error processing feed %s: %v", setting.URL, err)
-        }
-    }
-    return nil
+	for _, setting := range rssSettings {
+		if err := s.ProcessFeed(ctx, setting.URL, setting.Filter); err != nil {
+			log.Printf("Error processing feed %s: %v", setting.URL, err)
+		}
+	}
+	return nil
 }
 
 func sortEntriesByPublishedAsc(entries []*entity.FeedEntry) {

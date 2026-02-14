@@ -14,10 +14,10 @@ func TestLoadRSSURLs_Numbered(t *testing.T) {
 	defer os.Unsetenv("RSS_URL_2")
 	defer os.Unsetenv("RSS_URL_3")
 
-	urls := loadRSSURLs()
+	settings := loadRSSURLs()
 
-	if len(urls) != 3 {
-		t.Errorf("expected 3 URLs, got %d", len(urls))
+	if len(settings) != 3 {
+		t.Errorf("expected 3 settings, got %d", len(settings))
 	}
 
 	expected := []string{
@@ -26,9 +26,12 @@ func TestLoadRSSURLs_Numbered(t *testing.T) {
 		"https://example.tld/rss3",
 	}
 
-	for i, url := range urls {
-		if url != expected[i] {
-			t.Errorf("URL[%d]: expected %s, got %s", i, expected[i], url)
+	for i, s := range settings {
+		if s.URL != expected[i] {
+			t.Errorf("URL[%d]: expected %s, got %s", i, expected[i], s.URL)
+		}
+		if s.Filter != false {
+			t.Errorf("Filter[%d]: expected false when not set, got %v", i, s.Filter)
 		}
 	}
 }
@@ -41,21 +44,48 @@ func TestLoadRSSURLs_NumberedWithGap(t *testing.T) {
 	defer os.Unsetenv("RSS_URL_2")
 	defer os.Unsetenv("RSS_URL_4")
 
-	urls := loadRSSURLs()
+	settings := loadRSSURLs()
 
-	if len(urls) != 2 {
-		t.Errorf("expected 2 URLs, got %d", len(urls))
+	if len(settings) != 2 {
+		t.Errorf("expected 2 settings, got %d", len(settings))
 	}
 }
 
 func TestLoadRSSURLs_NoNumbered(t *testing.T) {
-	urls := loadRSSURLs()
+	settings := loadRSSURLs()
 
-	if urls == nil {
-		urls = []string{}
+	if len(settings) != 0 {
+		t.Errorf("expected 0 settings, got %d", len(settings))
 	}
-	if len(urls) != 0 {
-		t.Errorf("expected 0 URLs, got %d", len(urls))
+}
+
+func TestLoadRSSURLs_WithFilter(t *testing.T) {
+	os.Setenv("RSS_URL_1", "https://example.tld/rss1")
+	os.Setenv("RSS_URL_1_FILTER", "true")
+	os.Setenv("RSS_URL_2", "https://example.tld/rss2")
+	os.Setenv("RSS_URL_2_FILTER", "false")
+	os.Setenv("RSS_URL_3", "https://example.tld/rss3")
+	// RSS_URL_3_FILTER は設定しない
+	defer os.Unsetenv("RSS_URL_1")
+	defer os.Unsetenv("RSS_URL_1_FILTER")
+	defer os.Unsetenv("RSS_URL_2")
+	defer os.Unsetenv("RSS_URL_2_FILTER")
+	defer os.Unsetenv("RSS_URL_3")
+
+	settings := loadRSSURLs()
+
+	if len(settings) != 3 {
+		t.Fatalf("expected 3 settings, got %d", len(settings))
+	}
+
+	if settings[0].Filter != true {
+		t.Errorf("expected Filter[0] to be true, got %v", settings[0].Filter)
+	}
+	if settings[1].Filter != false {
+		t.Errorf("expected Filter[1] to be false, got %v", settings[1].Filter)
+	}
+	if settings[2].Filter != false {
+		t.Errorf("expected Filter[2] to be false when not set, got %v", settings[2].Filter)
 	}
 }
 
@@ -113,6 +143,39 @@ func TestLoadConfig_NumberedRSSURLs(t *testing.T) {
 
 	if cfg.LocalOnly != false {
 		t.Errorf("expected LocalOnly to be false by default, got %v", cfg.LocalOnly)
+	}
+}
+
+func TestLoadConfig_WithFilterSettings(t *testing.T) {
+	os.Setenv("MISSKEY_HOST", "test.example.tld")
+	os.Setenv("AUTH_TOKEN", "test_token")
+	os.Setenv("RSS_URL_1", "https://example.tld/rss1")
+	os.Setenv("RSS_URL_1_FILTER", "true")
+	os.Setenv("RSS_URL_2", "https://example.tld/rss2")
+
+	defer os.Unsetenv("MISSKEY_HOST")
+	defer os.Unsetenv("AUTH_TOKEN")
+	defer os.Unsetenv("RSS_URL_1")
+	defer os.Unsetenv("RSS_URL_1_FILTER")
+	defer os.Unsetenv("RSS_URL_2")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if len(cfg.RSSURL) != 2 {
+		t.Fatalf("expected 2 RSS settings, got %d", len(cfg.RSSURL))
+	}
+
+	if cfg.RSSURL[0].URL != "https://example.tld/rss1" {
+		t.Errorf("expected URL 'https://example.tld/rss1', got '%s'", cfg.RSSURL[0].URL)
+	}
+	if cfg.RSSURL[0].Filter != true {
+		t.Errorf("expected Filter to be true, got %v", cfg.RSSURL[0].Filter)
+	}
+	if cfg.RSSURL[1].Filter != false {
+		t.Errorf("expected Filter to be false when not set, got %v", cfg.RSSURL[1].Filter)
 	}
 }
 
