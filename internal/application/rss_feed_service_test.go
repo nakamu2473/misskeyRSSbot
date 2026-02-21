@@ -16,7 +16,7 @@ type mockFeedRepository struct {
 	err     error
 }
 
-func (m *mockFeedRepository) Fetch(ctx context.Context, url string, keywords []string) ([]*entity.FeedEntry, error) {
+func (m *mockFeedRepository) Fetch(ctx context.Context, url string) ([]*entity.FeedEntry, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -412,5 +412,79 @@ func TestRSSFeedService_ProcessFeed_FirstRunLatestOnlyDisabled_SkipProcessed(t *
 
 	if len(noteRepo.posted) != 2 {
 		t.Errorf("expected 2 notes posted (skipping processed guid-1), got %d", len(noteRepo.posted))
+	}
+}
+
+func TestFilterByKeywords_MatchesTitle(t *testing.T) {
+	now := time.Now()
+	entries := []*entity.FeedEntry{
+		entity.NewFeedEntry("マユリカの新番組", "https://example.tld/1", "お笑いの話題", now, "guid-1"),
+		entity.NewFeedEntry("関係ない記事", "https://example.tld/2", "関係ない内容", now, "guid-2"),
+	}
+
+	filtered := filterByKeywords(entries, []string{"マユリカ", "エバース"})
+
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(filtered))
+	}
+	if filtered[0].Title != "マユリカの新番組" {
+		t.Errorf("expected 'マユリカの新番組', got '%s'", filtered[0].Title)
+	}
+}
+
+func TestFilterByKeywords_MatchesDescription(t *testing.T) {
+	now := time.Now()
+	entries := []*entity.FeedEntry{
+		entity.NewFeedEntry("お笑い番組まとめ", "https://example.tld/1", "エバースが出演する番組", now, "guid-1"),
+		entity.NewFeedEntry("別の記事", "https://example.tld/2", "全く関係ない内容", now, "guid-2"),
+	}
+
+	filtered := filterByKeywords(entries, []string{"マユリカ", "エバース"})
+
+	if len(filtered) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(filtered))
+	}
+	if filtered[0].GUID != "guid-1" {
+		t.Errorf("expected guid-1, got '%s'", filtered[0].GUID)
+	}
+}
+
+func TestFilterByKeywords_NoKeywordsReturnsAll(t *testing.T) {
+	now := time.Now()
+	entries := []*entity.FeedEntry{
+		entity.NewFeedEntry("記事1", "https://example.tld/1", "内容1", now, "guid-1"),
+		entity.NewFeedEntry("記事2", "https://example.tld/2", "内容2", now, "guid-2"),
+	}
+
+	filtered := filterByKeywords(entries, nil)
+
+	if len(filtered) != 2 {
+		t.Errorf("expected 2 entries when keywords is nil, got %d", len(filtered))
+	}
+}
+
+func TestFilterByKeywords_EmptyKeywordsReturnsAll(t *testing.T) {
+	now := time.Now()
+	entries := []*entity.FeedEntry{
+		entity.NewFeedEntry("記事1", "https://example.tld/1", "内容1", now, "guid-1"),
+	}
+
+	filtered := filterByKeywords(entries, []string{})
+
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 entry when keywords is empty, got %d", len(filtered))
+	}
+}
+
+func TestFilterByKeywords_NoMatch(t *testing.T) {
+	now := time.Now()
+	entries := []*entity.FeedEntry{
+		entity.NewFeedEntry("関係ない記事", "https://example.tld/1", "関係ない内容", now, "guid-1"),
+	}
+
+	filtered := filterByKeywords(entries, []string{"マユリカ", "エバース"})
+
+	if len(filtered) != 0 {
+		t.Errorf("expected 0 entries, got %d", len(filtered))
 	}
 }

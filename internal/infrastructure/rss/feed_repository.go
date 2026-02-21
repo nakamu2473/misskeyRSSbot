@@ -3,7 +3,6 @@ package rss
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"misskeyRSSbot/internal/domain/entity"
 	"misskeyRSSbot/internal/domain/repository"
@@ -21,7 +20,7 @@ func NewFeedRepository() repository.FeedRepository {
 	}
 }
 
-func (r *feedRepository) Fetch(ctx context.Context, url string, keywords []string) ([]*entity.FeedEntry, error) {
+func (r *feedRepository) Fetch(ctx context.Context, url string) ([]*entity.FeedEntry, error) {
 	feed, err := r.parser.ParseURLWithContext(url, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse RSS feed: %w", err)
@@ -46,20 +45,6 @@ func (r *feedRepository) Fetch(ctx context.Context, url string, keywords []strin
 			*item.PublishedParsed,
 			guid,
 		)
-
-		// Keywords が空の場合はフィルターなし（全件返す）
-		if len(keywords) > 0 {
-			found := false
-			for _, k := range keywords {
-				if strings.Contains(entry.Title, k) || strings.Contains(entry.Description, k) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				continue
-			}
-		}
 
 		entries = append(entries, entry)
 	}

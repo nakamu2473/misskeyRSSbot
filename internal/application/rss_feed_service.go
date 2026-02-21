@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strings"
 	"time"
 
 	"misskeyRSSbot/internal/domain/entity"
@@ -49,10 +50,12 @@ func NewRSSFeedService(
 }
 
 func (s *RSSFeedService) ProcessFeed(ctx context.Context, setting config.RSSSettings) error {
-	entries, err := s.feedRepo.Fetch(ctx, setting.URL, setting.Keywords)
+	entries, err := s.feedRepo.Fetch(ctx, setting.URL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch RSS feed [%s]: %w", setting.URL, err)
 	}
+
+	entries = filterByKeywords(entries, setting.Keywords)
 	log.Printf("Processing %d entries from %s", len(entries), setting.URL)
 
 	if len(entries) == 0 {
@@ -187,6 +190,23 @@ func (s *RSSFeedService) ProcessAllFeeds(ctx context.Context, rssSettings []conf
 		}
 	}
 	return nil
+}
+
+func filterByKeywords(entries []*entity.FeedEntry, keywords []string) []*entity.FeedEntry {
+	if len(keywords) == 0 {
+		return entries
+	}
+
+	var filtered []*entity.FeedEntry
+	for _, entry := range entries {
+		for _, k := range keywords {
+			if strings.Contains(entry.Title, k) || strings.Contains(entry.Description, k) {
+				filtered = append(filtered, entry)
+				break
+			}
+		}
+	}
+	return filtered
 }
 
 func sortEntriesByPublishedAsc(entries []*entity.FeedEntry) {
