@@ -104,15 +104,15 @@ func TestLoadRSSURLs_NumberedTakesPrecedenceOverLegacy(t *testing.T) {
 
 func TestLoadRSSURLs_WithKeywords(t *testing.T) {
 	os.Setenv("RSS_URL_1", "https://example.tld/rss1")
-	os.Setenv("SEARCH_KEYWORDS_1", "マユリカ,エバース")
+	os.Setenv("RSS_URL_1_FILTER", "マユリカ,エバース")
 	os.Setenv("RSS_URL_2", "https://example.tld/rss2")
-	os.Setenv("SEARCH_KEYWORDS_2", "テスト")
+	os.Setenv("RSS_URL_2_FILTER", "テスト")
 	os.Setenv("RSS_URL_3", "https://example.tld/rss3")
-	// SEARCH_KEYWORDS_3 は設定しない
+	// RSS_URL_3_FILTER は設定しない
 	defer os.Unsetenv("RSS_URL_1")
-	defer os.Unsetenv("SEARCH_KEYWORDS_1")
+	defer os.Unsetenv("RSS_URL_1_FILTER")
 	defer os.Unsetenv("RSS_URL_2")
-	defer os.Unsetenv("SEARCH_KEYWORDS_2")
+	defer os.Unsetenv("RSS_URL_2_FILTER")
 	defer os.Unsetenv("RSS_URL_3")
 
 	settings := loadRSSURLs()
@@ -139,9 +139,9 @@ func TestLoadRSSURLs_WithKeywords(t *testing.T) {
 
 func TestLoadRSSURLs_KeywordsWithSpaces(t *testing.T) {
 	os.Setenv("RSS_URL_1", "https://example.tld/rss1")
-	os.Setenv("SEARCH_KEYWORDS_1", " マユリカ , エバース , ")
+	os.Setenv("RSS_URL_1_FILTER", " マユリカ , エバース , ")
 	defer os.Unsetenv("RSS_URL_1")
-	defer os.Unsetenv("SEARCH_KEYWORDS_1")
+	defer os.Unsetenv("RSS_URL_1_FILTER")
 
 	settings := loadRSSURLs()
 
@@ -194,13 +194,13 @@ func TestLoadConfig_WithKeywords(t *testing.T) {
 	os.Setenv("MISSKEY_HOST", "test.example.tld")
 	os.Setenv("AUTH_TOKEN", "test_token")
 	os.Setenv("RSS_URL_1", "https://example.tld/rss1")
-	os.Setenv("SEARCH_KEYWORDS_1", "マユリカ,エバース")
+	os.Setenv("RSS_URL_1_FILTER", "マユリカ,エバース")
 	os.Setenv("RSS_URL_2", "https://example.tld/rss2")
 
 	defer os.Unsetenv("MISSKEY_HOST")
 	defer os.Unsetenv("AUTH_TOKEN")
 	defer os.Unsetenv("RSS_URL_1")
-	defer os.Unsetenv("SEARCH_KEYWORDS_1")
+	defer os.Unsetenv("RSS_URL_1_FILTER")
 	defer os.Unsetenv("RSS_URL_2")
 
 	cfg, err := LoadConfig()

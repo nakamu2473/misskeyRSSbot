@@ -74,8 +74,8 @@ func loadRSSURLs() []RSSSettings {
 			break
 		}
 
-		// RSS_URL_1 に対応する SEARCH_KEYWORDS_1 を読み込む
-		keywordsKey := fmt.Sprintf("SEARCH_KEYWORDS_%d", i)
+		// RSS_URL_1 に対応する RSS_URL_1_FILTER を読み込む
+		keywordsKey := fmt.Sprintf("RSS_URL_%d_FILTER", i)
 		rawKeywords := os.Getenv(keywordsKey)
 		var keywords []string
 		if rawKeywords != "" {
